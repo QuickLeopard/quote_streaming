@@ -1,0 +1,8 @@
+[workspace]
+resolver = "3"
+members = [
+    "quote_generator_lib",
+    "quote_streamer",
+    "quote_client",
+]
+
