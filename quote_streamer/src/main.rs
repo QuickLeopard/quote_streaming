@@ -8,9 +8,24 @@ use crate::server::handle_client;
 
 mod server;
 
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(name = "quote_streamer")]
+#[command(about = "Quote Streamer")]
+struct Cli {
+    #[arg(short='H', long)]
+    host: String,
+    
+    #[arg(short, long)]
+    port: u16,
+}
+
+
 fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind ("127.0.0.1:12345")?;
-    println!("Hello, from server!");
+    let cli = Cli::parse();
+    let listener = TcpListener::bind (format! ("{}:{}", cli.host, cli.port))?;
+    println!("Starting Quote Streamer on port {}", cli.port);
 
     for stream in listener.incoming () {
         match stream {
