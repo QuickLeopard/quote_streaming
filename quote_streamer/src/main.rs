@@ -25,7 +25,7 @@ struct Cli {
 fn main() -> std::io::Result<()> {
     let cli = Cli::parse();
     let listener = TcpListener::bind (format! ("{}:{}", cli.host, cli.port))?;
-    println!("Starting Quote Streamer on port {}", cli.port);
+    println!("Starting Quote Streamer listening on {}:{}", cli.host, cli.port);
 
     for stream in listener.incoming () {
         match stream {
