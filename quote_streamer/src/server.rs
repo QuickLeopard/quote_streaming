@@ -1,5 +1,32 @@
+use std::thread;
 use std::net::TcpStream;
 use std::io::{BufReader, BufRead, Write};
+
+use crate::quote_udp_sender::{self, QuoteSender};
+
+fn stream_quotes (addr: &str, tickers: &str) -> std::thread::JoinHandle<()> {
+    let addr = addr.to_string().clone ();
+    let tickers = tickers.to_string().clone ();
+    // Implementation for streaming quotes
+    let handle = thread::spawn(move || {
+        // Simulate streaming quotes to the given UDP address
+        println!("Streaming quotes for {} to {}", tickers, addr);
+
+        //quote_udp_sender.start_broadcasting(addr.clone(), 1000);
+
+        match QuoteSender::new("0.0.0.0:0") {
+            Ok(quote_sender) => {
+                if let Err(e) = quote_sender.start_broadcasting(addr, 1000) {
+                    eprintln!("Failed to start broadcasting: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to create QuoteSender: {}", e);
+            }
+        }
+    });
+    handle
+}
 
 pub fn handle_client (stream: TcpStream) {
     let mut writer = stream.try_clone().expect("failed to clone stream");
@@ -37,9 +64,10 @@ pub fn handle_client (stream: TcpStream) {
                         let tickers = parts.next ();
                         match (addr, tickers) {
                             (Some(addr), Some(tickers)) if addr.starts_with("UDP://") => {
+                                let _handle = stream_quotes (&addr[6..], tickers);
                                 &format!("Got STREAM command addr: {} tickers: {}\n", addr.to_lowercase(), tickers)
                             }
-                            _ => "ERROR: use STREAM udp://127.0.0.1:1234 AAPL,TSLA\n"
+                            _ => "ERROR: use like STREAM udp://127.0.0.1:1234 AAPL,TSLA\n"
                         }
                     }
                     _ => {

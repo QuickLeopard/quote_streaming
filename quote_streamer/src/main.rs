@@ -3,12 +3,12 @@ use std::net::TcpListener;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+use clap::Parser;
 
 use crate::server::handle_client;
 
 mod server;
-
-use clap::Parser;
+mod quote_udp_sender;
 
 #[derive(Parser)]
 #[command(name = "quote_streamer")]
