@@ -179,7 +179,9 @@ dependencies = [
 name = "quote_client"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "clap",
+ "quote_generator_lib",
  "socket2",
 ]
 

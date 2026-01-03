@@ -8,6 +8,10 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 
+mod quote_udp_receiver;
+
+//use crate::quote_udp_receiver::{self, QuoteReceiver};
+
 #[derive(Parser)]
 #[command(name = "quote_client")]
 #[command(about = "Quote Client")]
@@ -49,10 +53,51 @@ fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>
     Ok((stream, reader))
 }
 
+// Отправка команды
+fn send_command(
+    stream: &mut TcpStream,
+    reader: &mut BufReader<TcpStream>,
+    command: &str,
+) -> io::Result<String> {
+    stream.write_all(command.as_bytes())?;
+    stream.write_all(b"\n")?;
+    stream.flush()?;
+
+    let mut buffer = String::new();
+    let bytes = reader.read_line(&mut buffer)?;
+    if bytes == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "Server closed connection",
+        ));
+    }
+    Ok(buffer)
+}
+
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     println!("Connecting Quote Client to {}:{}", cli.host, cli.port);
-    let (stream, reader) = connect(&cli.host, cli.port)?;
+    let (mut stream, mut reader) = connect(&cli.host, cli.port)?;
+
+    let addr = "127.0.0.1:12345";
+    let command = "STREAM udp://127.0.0.1:12345 AAPL,TSLA";
+
+    match send_command(&mut stream, &mut reader, command) {
+        Ok(resp) => {
+            print!("Server response: {}", resp);
+            let quote_receiver = quote_udp_receiver::QuoteReceiver::new(addr)?;
+            if let Err(e) = quote_receiver.receive_loop() {
+                eprintln!("Receive loop failed: {}", e);
+            }
+        },
+        Err(e) => {
+            eprintln!("Command failed: {}.", e);               
+        }
+    }
+
+    loop {
+
+    }
 
     Ok(())
 }
