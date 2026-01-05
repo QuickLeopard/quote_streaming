@@ -1,5 +1,4 @@
-
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StockQuote {
@@ -20,9 +19,12 @@ impl StockQuote {
     }
 
     pub fn to_string(&self) -> String {
-        format!("{}|{}|{}|{}", self.ticker, self.price, self.volume, self.timestamp)
+        format!(
+            "{}|{}|{}|{}",
+            self.ticker, self.price, self.volume, self.timestamp
+        )
     }
-    
+
     pub fn from_string(s: &str) -> Option<Self> {
         let parts: Vec<&str> = s.split('|').collect();
         if parts.len() == 4 {

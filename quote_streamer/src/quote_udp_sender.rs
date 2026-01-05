@@ -1,9 +1,13 @@
-
 use bincode;
+
 use std::net::UdpSocket;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
-use rand;
+
+use std::collections::HashSet;
+
+use bus::Bus;
 
 use quote_generator_lib::core::StockQuote;
 
@@ -17,7 +21,6 @@ impl QuoteSender {
         Ok(Self { socket })
     }
 
-
     // Метод отправки сообщений в сокет
     pub fn send_to(
         &self,
@@ -29,27 +32,36 @@ impl QuoteSender {
         Ok(())
     }
 
-     pub fn start_broadcasting(
+    pub fn start_broadcasting_with_bus(
         self,
         target_addr: String,
-        interval_ms: u64,
+        tickers: String,
+        bus: Arc<Mutex<Bus<StockQuote>>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        thread::spawn(move || {
-            let mut quote = StockQuote::new ("AAPL", 150.0, 1000, quote_generator_lib::get_current_timestamp());
+        let tickers = tickers
+            .split(",")
+            .map(|s| s.to_string())
+            .collect::<HashSet<String>>();
 
-            loop {
-                // Обновление цены и объема для имитации реальных данных
-                quote.price += (rand::random::<f64>() - 0.5) * 2.0; // случайное изменение цены
-                quote.volume += rand::random::<u32>() % 100; // случайное изменение объема
+        let mut bus = bus.lock().unwrap();
 
-                if let Err(e) = self.send_to(&quote, &target_addr) {
-                    eprintln!("Failed to send quote: {}", e);
+        let mut reader = bus.add_rx();
+
+        let _ = thread::spawn(move || {
+            while let Ok(quote) = reader.recv() {
+                let ticker = quote.ticker.clone();
+                if tickers.contains(&ticker) {
+                    println!("Broadcasting with bus got: {:?}", quote);
+
+                    if let Err(e) = self.send_to(&quote, &target_addr) {
+                        eprintln!("Failed to send quote: {}", e);
+                    }
+                } else {
+                    //println! ("Skipping ticker: {}", ticker);
                 }
-
-                thread::sleep(Duration::from_millis(interval_ms));
             }
         });
+
         Ok(())
     }
-    
 }

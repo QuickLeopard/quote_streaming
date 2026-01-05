@@ -1,27 +1,14 @@
-
 use socket2::{Domain, Protocol, Socket, Type};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+//use std::sync::{Arc, Mutex};
+
+use std::time::{Duration};
 
 use clap::Parser;
 
+mod cli_args;
 mod quote_udp_receiver;
-
-//use crate::quote_udp_receiver::{self, QuoteReceiver};
-
-#[derive(Parser)]
-#[command(name = "quote_client")]
-#[command(about = "Quote Client")]
-struct Cli {
-    #[arg(short='H', long)]
-    host: String,
-    
-    #[arg(short, long)]
-    port: u16,
-}
 
 // Подключение к серверу
 fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>)> {
@@ -75,29 +62,29 @@ fn send_command(
 }
 
 fn main() -> io::Result<()> {
-    let cli = Cli::parse();
-    println!("Connecting Quote Client to {}:{}", cli.host, cli.port);
+    let cli = cli_args::CliArgs::parse();
+    println!(
+        "Connecting Quote Client to {}:{} stream_addr: {} tickers: {}",
+        cli.host, cli.port, cli.stream_addr, cli.tickers
+    );
     let (mut stream, mut reader) = connect(&cli.host, cli.port)?;
 
-    let addr = "127.0.0.1:12345";
-    let command = "STREAM udp://127.0.0.1:12345 AAPL,TSLA";
+    let command = &format!("STREAM udp://{} {}", cli.stream_addr, cli.tickers);
 
     match send_command(&mut stream, &mut reader, command) {
         Ok(resp) => {
             print!("Server response: {}", resp);
-            let quote_receiver = quote_udp_receiver::QuoteReceiver::new(addr)?;
+            let quote_receiver = quote_udp_receiver::QuoteReceiver::new(&cli.stream_addr)?;
             if let Err(e) = quote_receiver.receive_loop() {
                 eprintln!("Receive loop failed: {}", e);
             }
-        },
+        }
         Err(e) => {
-            eprintln!("Command failed: {}.", e);               
+            eprintln!("Command failed: {}.", e);
         }
     }
 
-    loop {
-
-    }
+    loop {}
 
     Ok(())
 }
