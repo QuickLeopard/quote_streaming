@@ -17,6 +17,18 @@ impl QuoteGenerator {
         }
     }
 
+    fn generate_volume (ticker: &str) -> u32 {
+        let volume = match ticker {
+             // Популярные акции имеют больший объём
+            "AAPL" | "MSFT" | "TSLA" => 1000 + (rand::random::<f64>() * 5000.0) as u32,
+            "GOOGL" | "AMZN" | "FB" => 500 + (rand::random::<f64>() * 2000.0) as u32,
+            // Обычные акции - средний объём
+            _ => 100 + (rand::random::<f64>() * 1000.0) as u32,
+        };
+        volume
+
+    }
+
     /// Generates or updates a quote for the given ticker symbol
     /// 
     /// Returns the updated quote or None if generation fails
@@ -33,7 +45,7 @@ impl QuoteGenerator {
             .or_insert(StockQuote::new(
                 ticker,
                 100.0 + rand::random::<f64>() * 100.0,
-                1000,
+                Self::generate_volume(ticker),
                 crate::get_current_timestamp(),
             ));
 
