@@ -125,7 +125,9 @@ Example:
 Terminal 1 (Server):
 ```bash
 $ cargo run -p quote_streamer -- --host 127.0.0.1 --port 8080
-Running quote streamer on 127.0.0.1:8080...
+Starting Quote Streamer listening on 127.0.0.1:7777
+Starting streaming for tickers: ["AAPL", "ABBV", "ABT", "ACN", "ADBE", "ADI", "ADP", "AEP", "AMGN", "AMT", "AMZN", "AON", "APTV", "AXP", "BDX", "BKNG", "BLK", "BMY", "BSX", "C", "CAT", "CI", "CL", "CMCSA", "CSCO", "COF", "COST", "CRM", "D", "DD", "DE", "DHR", "DIS", "DUK", "ECL", "EMR", "ETN", "EW", "FDX", "FIS", "FISV", "GE", "GILD", "GOOGL", "GS", "HD", "HON", "HUM", "ICE", "INTC", "INTU", "ISRG", "ITW", "JNJ", "JPM", "KLAC", "LLY", "LIN", "LMT", "LOW", "MCD", "MCO", "MDT", "MDLZ", "META", "MMM", "MO", "MS", "MSFT", "NEE", "NFLX", "NKE", "NOC", "NSC", "NVDA", "ORCL", "PEP", "PFE", "PG", "PGR", "PLD", "PNC", "PSA", "PYPL", "QCOM", "ROP", "RTX", "SBUX", "SCHW", "SHW", "SLB", "SO", "SPGI", "SYK", "T", "TGT", "TJX", "TMO", "TSLA", "TXN", "UNH", "UNP", "UPS", "USB", "V", "VRTX", "WM", "ZTS"]
+Streaming quotes for tickers: AAPL,MSFT,TSLA to address: 127.0.0.1:5555
 ```
 
 Terminal 2 (Client):
