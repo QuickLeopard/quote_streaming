@@ -27,7 +27,7 @@ impl QuoteReceiver {
     /// Starts the receive loop, connecting to server and handling quotes and ping/pong
     /// 
     /// Sends ping every 2 seconds and receives quotes from the server
-    pub fn receive_loop(self, server_addr: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn receive_loop(self, server_addr: &str, shutdown: Arc<AtomicBool>) -> Result<(), Box<dyn std::error::Error>> {
         // Connect socket to server for bidirectional UDP communication
         self.socket.connect(server_addr)?;
         
@@ -39,8 +39,9 @@ impl QuoteReceiver {
         // This keeps the connection alive and lets server know client is still active
         let socket_clone = self.socket.try_clone()?;
         let running_clone = Arc::clone(&running);
+        let shutdown_clone = Arc::clone(&shutdown);
         thread::spawn(move || {
-            while running_clone.load(Ordering::Relaxed) {
+            while running_clone.load(Ordering::Relaxed) && !shutdown_clone.load(Ordering::Relaxed) {
                 // Send ping message to server
                 if let Err(e) = socket_clone.send(b"ping") {
                     eprintln!("[{}] Failed to send ping: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
@@ -55,6 +56,13 @@ impl QuoteReceiver {
 
         // Main receive loop - receives both pong responses and stock quotes from server
         loop {
+            // Check for Ctrl+C signal
+            if shutdown.load(Ordering::Relaxed) {
+                println!("[{}] Shutdown signal received, stopping client", Local::now().format("%Y-%m-%d %H:%M:%S"));
+                running.store(false, Ordering::Relaxed);
+                break;
+            }
+            
             match self.socket.recv(&mut buf) {
                 Ok(size) => {
                     // Check if received message is a "pong" response

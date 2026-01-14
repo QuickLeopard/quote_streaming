@@ -1,7 +1,8 @@
 use socket2::{Domain, Protocol, Socket, Type};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
-//use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::time::{Duration};
 
@@ -73,6 +74,16 @@ fn send_command(
 
 fn main() -> io::Result<()> {
     let cli = cli_args::CliArgs::parse();
+    
+    // Setup Ctrl+C handler for graceful shutdown
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_clone = Arc::clone(&shutdown);
+    
+    ctrlc::set_handler(move || {
+        println!("\n[{}] Ctrl+C received, shutting down...", Local::now().format("%Y-%m-%d %H:%M:%S"));
+        shutdown_clone.store(true, Ordering::Relaxed);
+    }).expect("Error setting Ctrl+C handler");
+    
     println!(
         "[{}] Connecting Quote Client to {}:{} stream_addr: {} tickers: {}",
         Local::now().format("%Y-%m-%d %H:%M:%S"),
@@ -94,7 +105,7 @@ fn main() -> io::Result<()> {
                 .unwrap_or(&cli.stream_addr);
             
             let quote_receiver = quote_udp_receiver::QuoteReceiver::new(&cli.stream_addr)?;
-            if let Err(e) = quote_receiver.receive_loop(server_addr) {
+            if let Err(e) = quote_receiver.receive_loop(server_addr, shutdown) {
                 eprintln!("[{}] Receive loop failed: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
             }
             println!("[{}] Client shutdown complete", Local::now().format("%Y-%m-%d %H:%M:%S"));
