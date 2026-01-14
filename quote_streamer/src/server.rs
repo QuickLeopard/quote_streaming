@@ -1,4 +1,5 @@
 use bus::Bus;
+use log::{info, error, debug};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) ->
         Local::now().format("%Y-%m-%d %H:%M:%S"),
         tickers, addr
     );
+    info!("Streaming quotes for tickers: {} to address: {}", tickers, addr);
 
     match QuoteSender::new("0.0.0.0:0") {
         Ok(quote_sender) => {
@@ -28,12 +30,14 @@ fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) ->
                 Ok(server_addr) => Some(server_addr),
                 Err(e) => {
                     eprintln!("[{}] Failed to start broadcasting: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                    error!("Failed to start broadcasting: {}", e);
                     None
                 }
             }
         }
         Err(e) => {
             eprintln!("[{}] Failed to create QuoteSender: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+            error!("Failed to create QuoteSender: {}", e);
             None
         }
     }

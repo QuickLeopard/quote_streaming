@@ -8,6 +8,9 @@ use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
 
+const PING_INTERVAL_SECS: u64 = 2;
+const RECEIVE_BUFFER_SIZE: usize = 1024;
+
 /// UDP receiver for receiving stock quotes from the server
 pub struct QuoteReceiver {
     socket: UdpSocket,
@@ -27,7 +30,7 @@ impl QuoteReceiver {
     pub fn receive_loop(self, server_addr: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.socket.connect(server_addr)?;
         
-        let mut buf = [0u8; 1024];
+        let mut buf = [0u8; RECEIVE_BUFFER_SIZE];
         let running = Arc::new(AtomicBool::new(true));
         
         // Ping sender thread
@@ -39,7 +42,7 @@ impl QuoteReceiver {
                     eprintln!("[{}] Failed to send ping: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
                     break;
                 }
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(Duration::from_secs(PING_INTERVAL_SECS));
             }
         });
 

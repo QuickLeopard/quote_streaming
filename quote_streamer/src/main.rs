@@ -1,4 +1,5 @@
 use clap::Parser;
+use log::{info, error};
 use std::net::TcpListener;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -17,6 +18,10 @@ mod tickers;
 
 #[cfg(test)]
 mod tests;
+
+const QUOTE_GENERATION_INTERVAL_MS: u64 = 5000;
+const QUOTE_GENERATION_DELAY_MS: u64 = 10;
+const BUS_CAPACITY: usize = 10;
 
 #[derive(Parser)]
 #[command(name = "quote_streamer")]
@@ -44,7 +49,7 @@ fn streaming(tickers: Vec<String>, bus: Arc<Mutex<Bus<StockQuote>>>, interval_ms
                     if let Ok(mut bus) = bus.lock() {
                         bus.broadcast(quote.clone());
                     }
-                    thread::sleep(Duration::from_millis(10));
+                    thread::sleep(Duration::from_millis(QUOTE_GENERATION_DELAY_MS));
                 }
             }
             thread::sleep(Duration::from_millis(interval_ms));
@@ -53,25 +58,27 @@ fn streaming(tickers: Vec<String>, bus: Arc<Mutex<Bus<StockQuote>>>, interval_ms
 }
 
 fn main() -> std::io::Result<()> {
+    env_logger::init();
+    
     let cli = Cli::parse();
     let listener = TcpListener::bind(format!("{}:{}", cli.host, cli.port))?;
-    println!(
+    info!(
         "Starting Quote Streamer listening on {}:{}",
         cli.host, cli.port
     );
 
     let tickers = tickers::get_tickers();
 
-    println!("Starting streaming for tickers: {:?}", tickers);
+    info!("Starting streaming for tickers: {:?}", tickers);
 
     // Create internal bus for StockQuote streaming to the UDP clients in single producer -> multiple consumers mode
-    let bus: Arc<Mutex<Bus<StockQuote>>> = Arc::new(Mutex::new(Bus::new(10)));
+    let bus: Arc<Mutex<Bus<StockQuote>>> = Arc::new(Mutex::new(Bus::new(BUS_CAPACITY)));
 
     let bus_clone0 = Arc::clone(&bus);
     streaming(
         tickers,
         bus_clone0,
-        5000,
+        QUOTE_GENERATION_INTERVAL_MS,
     );
 
     for stream in listener.incoming() {
@@ -82,7 +89,7 @@ fn main() -> std::io::Result<()> {
                     handle_client(stream, bus_clone1);
                 });
             }
-            Err(e) => eprintln!("Connection failed: {}", e),
+            Err(e) => error!("Connection failed: {}", e),
         }
     }
 

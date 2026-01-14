@@ -10,4 +10,6 @@ rand = "0.8"
 bus = "2.4.1"
 quote_generator_lib = { path = "../quote_generator_lib" }
 chrono = "0.4"
+log = "0.4"
+env_logger = "0.11"
 

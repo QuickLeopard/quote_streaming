@@ -14,6 +14,10 @@ mod quote_udp_receiver;
 #[cfg(test)]
 mod tests;
 
+const TCP_KEEPALIVE_TIME_SECS: u64 = 10;
+const TCP_KEEPALIVE_INTERVAL_SECS: u64 = 5;
+const TCP_READ_TIMEOUT_SECS: u64 = 5;
+
 // Подключение к серверу
 fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>)> {
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
@@ -23,8 +27,8 @@ fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>
     {
         socket.set_tcp_keepalive(
             &socket2::TcpKeepalive::new()
-                .with_time(Duration::from_secs(10))
-                .with_interval(Duration::from_secs(5)),
+                .with_time(Duration::from_secs(TCP_KEEPALIVE_TIME_SECS))
+                .with_interval(Duration::from_secs(TCP_KEEPALIVE_INTERVAL_SECS)),
         )?;
     }
 
@@ -34,7 +38,7 @@ fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>
     socket.connect(&addr.into())?;
 
     let stream: TcpStream = socket.into();
-    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+    stream.set_read_timeout(Some(Duration::from_secs(TCP_READ_TIMEOUT_SECS)))?;
     let mut reader = BufReader::new(stream.try_clone()?);
 
     // Читаем welcome message один раз

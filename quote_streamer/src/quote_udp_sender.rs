@@ -11,8 +11,13 @@ use std::collections::HashSet;
 
 use bus::Bus;
 use chrono::Local;
+use log::{info, error, warn, debug};
 
 use quote_generator_lib::core::StockQuote;
+
+const PING_TIMEOUT_SECS: u64 = 5;
+const PING_CHECK_INTERVAL_SECS: u64 = 1;
+const SOCKET_READ_TIMEOUT_MS: u64 = 100;
 
 /// UDP sender for broadcasting stock quotes to clients
 pub struct QuoteSender {
@@ -72,7 +77,7 @@ impl QuoteSender {
         let target_addr_clone = target_addr.clone();
         
         thread::spawn(move || {
-            socket_clone.set_read_timeout(Some(Duration::from_millis(100))).ok();
+            socket_clone.set_read_timeout(Some(Duration::from_millis(SOCKET_READ_TIMEOUT_MS))).ok();
             let mut buf = [0u8; 64];
             
             while !shutdown_clone.load(Ordering::Relaxed) {
@@ -80,6 +85,7 @@ impl QuoteSender {
                     if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
                         if msg.trim() == "ping" {
                             println!("[{}] Received ping from {}", Local::now().format("%Y-%m-%d %H:%M:%S"), src);
+                            debug!("Received ping from {}", src);
                             if let Ok(mut last_ping) = last_ping_clone.lock() {
                                 *last_ping = Instant::now();
                             }
@@ -98,16 +104,18 @@ impl QuoteSender {
         
         thread::spawn(move || {
             while !shutdown_clone.load(Ordering::Relaxed) {
-                thread::sleep(Duration::from_secs(1));
+                thread::sleep(Duration::from_secs(PING_CHECK_INTERVAL_SECS));
                 if let Ok(last_ping) = last_ping_clone.lock() {
-                    if last_ping.elapsed() > Duration::from_secs(5) {
-                        println!("[{}] [TIMEOUT] No ping from {} for 5 seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
+                    if last_ping.elapsed() > Duration::from_secs(PING_TIMEOUT_SECS) {
+                        println!("[{}] [TIMEOUT] No ping from {} for {} seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2, PING_TIMEOUT_SECS);
+                        warn!("No ping from {} for {} seconds, shutting down all threads", target_addr_clone2, PING_TIMEOUT_SECS);
                         shutdown_clone.store(true, Ordering::Relaxed);
                         break;
                     }
                 }
             }
             println!("[{}] Timeout checker thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
+            info!("Timeout checker thread stopped for {}", target_addr_clone2);
         });
 
         // Broadcasting thread
@@ -116,15 +124,18 @@ impl QuoteSender {
                 if let Ok(quote) = reader.recv() {
                     if tickers.contains(&quote.ticker) {
                         println!("[{}] Broadcasting with bus got: {:?}", Local::now().format("%Y-%m-%d %H:%M:%S"), quote);
+                        debug!("Broadcasting quote: {:?}", quote);
                         if let Ok(encoded) = bincode::serialize(&quote) {
                             if let Err(e) = self.socket.send(&encoded) {
                                 eprintln!("[{}] Failed to send quote: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                                error!("Failed to send quote: {}", e);
                             }
                         }
                     }
                 }
             }
             println!("[{}] Broadcasting thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr);
+            info!("Broadcasting thread stopped for {}", target_addr);
         });
 
         Ok(server_addr)
