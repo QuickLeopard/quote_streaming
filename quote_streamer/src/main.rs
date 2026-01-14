@@ -13,6 +13,7 @@ use crate::server::handle_client;
 
 mod quote_udp_sender;
 mod server;
+mod tickers;
 
 #[derive(Parser)]
 #[command(name = "quote_streamer")]
@@ -57,7 +58,7 @@ fn main() -> std::io::Result<()> {
         cli.host, cli.port
     );
 
-    let tickers = vec!["AAPL".to_string(), "TSLA".to_string()];
+    let tickers = tickers::get_tickers();
 
     println!("Starting streaming for tickers: {:?}", tickers);
 
