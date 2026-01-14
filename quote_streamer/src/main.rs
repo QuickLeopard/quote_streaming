@@ -15,6 +15,9 @@ mod quote_udp_sender;
 mod server;
 mod tickers;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Parser)]
 #[command(name = "quote_streamer")]
 #[command(about = "Quote Streamer")]

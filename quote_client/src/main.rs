@@ -11,6 +11,9 @@ use chrono::Local;
 mod cli_args;
 mod quote_udp_receiver;
 
+#[cfg(test)]
+mod tests;
+
 // Подключение к серверу
 fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>)> {
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
