@@ -97,13 +97,12 @@ fn main() -> io::Result<()> {
             if let Err(e) = quote_receiver.receive_loop(server_addr) {
                 eprintln!("[{}] Receive loop failed: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
             }
+            println!("[{}] Client shutdown complete", Local::now().format("%Y-%m-%d %H:%M:%S"));
         }
         Err(e) => {
             eprintln!("[{}] Command failed: {}.", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
         }
     }
-
-    loop {}
 
     Ok(())
 }

@@ -65,6 +65,7 @@ impl QuoteReceiver {
                 }
                 Err(e) => {
                     eprintln!("[{}] Ошибка получения данных: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                    println!("[{}] Server disconnected, shutting down client", Local::now().format("%Y-%m-%d %H:%M:%S"));
                     running.store(false, Ordering::Relaxed);
                     break;
                 }
