@@ -42,18 +42,24 @@ cargo build -p quote_generator_lib
 ### Start the Quote Streamer Server
 
 ```bash
-cargo run -p quote_streamer -- --host 127.0.0.1 --port 8080
+RUST_LOG=info cargo run -p quote_streamer -- --host 127.0.0.1 --port 8080
 ```
 
 Or from the `quote_streamer` directory:
 
 ```bash
-cargo run -- --host 127.0.0.1 --port 8080
+RUST_LOG=info cargo run -- --host 127.0.0.1 --port 8080
 ```
 
 Options:
 - `-H, --host`: Server host address (required)
 - `-p, --port`: Server port number (required)
+
+Log levels:
+- `RUST_LOG=error` - Only errors
+- `RUST_LOG=warn` - Warnings and errors (includes timeout events)
+- `RUST_LOG=info` - Info, warnings, and errors (recommended)
+- `RUST_LOG=debug` - All messages including ping/pong and individual quotes
 
 ### Connect a Quote Client
 
@@ -94,9 +100,24 @@ Options:
 │   Quote Client           │
 │  - TCP Connection        │
 │  - UDP Quote Receiver    │
+│  - Ping Sender (2s)      │
 │  - CLI Interface         │
 └──────────────────────────┘
 ```
+
+## Ping/Pong Keep-Alive
+
+The system implements a UDP-based ping/pong mechanism to detect client disconnections:
+
+- **Client**: Sends "ping" message every 2 seconds to the server
+- **Server**: Responds with "pong" and tracks last ping time
+- **Timeout**: If no ping received for 5 seconds, server gracefully shuts down all threads for that client
+- **Graceful Shutdown**: When server disconnects, client detects the error and exits cleanly
+
+This ensures:
+- Server resources are freed when clients disconnect unexpectedly
+- No zombie connections or resource leaks
+- Clean shutdown on both sides
 
 ## Dependencies
 
@@ -107,6 +128,9 @@ Options:
 - **serde**: Serialization framework
 - **crossbeam**: Concurrency utilities
 - **libc**: C library bindings
+- **log**: Logging facade
+- **env_logger**: Logger implementation
+- **chrono**: Date and time utilities
 
 ## Stock Quote Format
 
@@ -124,29 +148,27 @@ Example:
 
 Terminal 1 (Server):
 ```bash
-$ cargo run -p quote_streamer -- --host 127.0.0.1 --port 8080
-Starting Quote Streamer listening on 127.0.0.1:7777
-Starting streaming for tickers: ["AAPL", "ABBV", "ABT", "ACN", "ADBE", "ADI", "ADP", "AEP", "AMGN", "AMT", "AMZN", "AON", "APTV", "AXP", "BDX", "BKNG", "BLK", "BMY", "BSX", "C", "CAT", "CI", "CL", "CMCSA", "CSCO", "COF", "COST", "CRM", "D", "DD", "DE", "DHR", "DIS", "DUK", "ECL", "EMR", "ETN", "EW", "FDX", "FIS", "FISV", "GE", "GILD", "GOOGL", "GS", "HD", "HON", "HUM", "ICE", "INTC", "INTU", "ISRG", "ITW", "JNJ", "JPM", "KLAC", "LLY", "LIN", "LMT", "LOW", "MCD", "MCO", "MDT", "MDLZ", "META", "MMM", "MO", "MS", "MSFT", "NEE", "NFLX", "NKE", "NOC", "NSC", "NVDA", "ORCL", "PEP", "PFE", "PG", "PGR", "PLD", "PNC", "PSA", "PYPL", "QCOM", "ROP", "RTX", "SBUX", "SCHW", "SHW", "SLB", "SO", "SPGI", "SYK", "T", "TGT", "TJX", "TMO", "TSLA", "TXN", "UNH", "UNP", "UPS", "USB", "V", "VRTX", "WM", "ZTS"]
-Streaming quotes for tickers: AAPL,MSFT,TSLA to address: 127.0.0.1:5555
+$ RUST_LOG=info cargo run -p quote_streamer -- --host 127.0.0.1 --port 8080
+[2026-01-14 15:00:00 INFO  quote_streamer] Starting Quote Streamer listening on 127.0.0.1:7777
+[2026-01-14 15:00:00 INFO  quote_streamer] Starting streaming for tickers: ["AAPL", "MSFT", ...]
+[2026-01-14 15:00:05 INFO  quote_streamer::server] Streaming quotes for tickers: AAPL,MSFT,TSLA to address: 127.0.0.1:5555
+[2026-01-14 15:00:05] Received ping from 127.0.0.1:5555
+[2026-01-14 15:00:07] Received ping from 127.0.0.1:5555
+...
 ```
 
 Terminal 2 (Client):
 ```bash
 $ cargo run -p quote_client -- --host 127.0.0.1 --port 8080 -A 127.0.0.1 --tickers AAPL,MSFT,TSLA
-Connecting Quote Client to 127.0.0.1:7777 stream_addr: 127.0.0.1:5555 tickers: AAPL,MSFT,TSLA
+[2026-01-14 15:00:05] Connecting Quote Client to 127.0.0.1:7777 stream_addr: 127.0.0.1:5555 tickers: AAPL,MSFT,TSLA
 Welcome to the Quote Streamer!
-Connected to server!
-Server response: Got STREAM command addr: udp://127.0.0.1:5555 tickers: AAPL,MSFT,TSLA
-Ресивер запущен на 127.0.0.1:5555
-Ожидание данных...
-StockQuote { ticker: "AAPL", price: 183.1325004178757, volume: 3980, timestamp: 1768380781617 }
-StockQuote { ticker: "MSFT", price: 112.58418974325119, volume: 3924, timestamp: 1768380782415 }
-StockQuote { ticker: "TSLA", price: 183.52005988007448, volume: 4200, timestamp: 1768380782759 }
-StockQuote { ticker: "AAPL", price: 183.70661265927828, volume: 4079, timestamp: 1768380787876 }
-StockQuote { ticker: "MSFT", price: 113.33087980964817, volume: 3937, timestamp: 1768380788662 }
-StockQuote { ticker: "TSLA", price: 183.0703381506419, volume: 4258, timestamp: 1768380788997 }
-StockQuote { ticker: "AAPL", price: 184.52031462143364, volume: 4112, timestamp: 1768380794109 }
-StockQuote { ticker: "MSFT", price: 113.66540765863219, volume: 3992, timestamp: 1768380794888 }
+[2026-01-14 15:00:05] Connected to server!
+[2026-01-14 15:00:05] Server response: Got STREAM command addr: udp://127.0.0.1:5555 tickers: AAPL,MSFT,TSLA server: 127.0.0.1:62005
+[2026-01-14 15:00:05] Ресивер запущен на 127.0.0.1:5555
+[2026-01-14 15:00:05] Ожидание данных...
+[2026-01-14 15:00:06] StockQuote { ticker: "AAPL", price: 183.1325004178757, volume: 3980, timestamp: 1768380781617 }
+[2026-01-14 15:00:07] StockQuote { ticker: "MSFT", price: 112.58418974325119, volume: 3924, timestamp: 1768380782415 }
+[2026-01-14 15:00:07] StockQuote { ticker: "TSLA", price: 183.52005988007448, volume: 4200, timestamp: 1768380782759 }
 ...
 ```
 
@@ -159,6 +181,10 @@ This project is part of a Rust learning course and demonstrates:
 - Pub-sub message patterns
 - CLI argument parsing
 - Struct serialization
+- Keep-alive mechanisms (ping/pong)
+- Graceful shutdown handling
+- Logging with log crate
+- Error handling without unwrap()
 
 ## License
 
