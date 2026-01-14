@@ -64,13 +64,16 @@ impl QuoteSender {
         let mut bus = bus.lock().map_err(|_| "Bus lock poisoned")?;
         let mut reader = bus.add_rx();
 
+        // Connect socket to client address for bidirectional UDP communication
         self.socket.connect(&target_addr)?;
         let server_addr = self.socket.local_addr()?.to_string();
 
+        // Shared state for coordinating thread shutdown
         let shutdown = Arc::new(AtomicBool::new(false));
         let last_ping = Arc::new(Mutex::new(Instant::now()));
 
-        // Ping listener thread
+        // Thread 1: Ping listener - receives ping messages from client and responds with pong
+        // This thread listens for incoming UDP packets and filters for "ping" messages
         let socket_clone = self.socket.try_clone()?;
         let shutdown_clone = Arc::clone(&shutdown);
         let last_ping_clone = Arc::clone(&last_ping);
@@ -80,15 +83,19 @@ impl QuoteSender {
             socket_clone.set_read_timeout(Some(Duration::from_millis(SOCKET_READ_TIMEOUT_MS))).ok();
             let mut buf = [0u8; 64];
             
+            // Keep listening until shutdown flag is set
             while !shutdown_clone.load(Ordering::Relaxed) {
                 if let Ok((size, src)) = socket_clone.recv_from(&mut buf) {
+                    // Check if received message is "ping"
                     if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
                         if msg.trim() == "ping" {
                             println!("[{}] Received ping from {}", Local::now().format("%Y-%m-%d %H:%M:%S"), src);
                             debug!("Received ping from {}", src);
+                            // Update last ping timestamp
                             if let Ok(mut last_ping) = last_ping_clone.lock() {
                                 *last_ping = Instant::now();
                             }
+                            // Send pong response back to client
                             let _ = socket_clone.send(b"pong");
                         }
                     }
@@ -97,7 +104,8 @@ impl QuoteSender {
             println!("[{}] Ping listener thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone);
         });
 
-        // Timeout checker thread
+        // Thread 2: Timeout checker - monitors last ping time and triggers shutdown if timeout
+        // Checks every second if client has sent a ping within the last 5 seconds
         let shutdown_clone = Arc::clone(&shutdown);
         let last_ping_clone = Arc::clone(&last_ping);
         let target_addr_clone2 = target_addr.clone();
@@ -105,10 +113,12 @@ impl QuoteSender {
         thread::spawn(move || {
             while !shutdown_clone.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_secs(PING_CHECK_INTERVAL_SECS));
+                // Check if last ping was more than PING_TIMEOUT_SECS ago
                 if let Ok(last_ping) = last_ping_clone.lock() {
                     if last_ping.elapsed() > Duration::from_secs(PING_TIMEOUT_SECS) {
                         println!("[{}] [TIMEOUT] No ping from {} for {} seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2, PING_TIMEOUT_SECS);
                         warn!("No ping from {} for {} seconds, shutting down all threads", target_addr_clone2, PING_TIMEOUT_SECS);
+                        // Set shutdown flag to stop all threads
                         shutdown_clone.store(true, Ordering::Relaxed);
                         break;
                     }
@@ -118,14 +128,19 @@ impl QuoteSender {
             info!("Timeout checker thread stopped for {}", target_addr_clone2);
         });
 
-        // Broadcasting thread
+        // Thread 3: Broadcasting - receives quotes from bus and sends to client
+        // Filters quotes by ticker and serializes them before sending via UDP
         thread::spawn(move || {
             while !shutdown.load(Ordering::Relaxed) {
+                // Receive quote from the pub-sub bus
                 if let Ok(quote) = reader.recv() {
+                    // Only send quotes for subscribed tickers
                     if tickers.contains(&quote.ticker) {
                         println!("[{}] Broadcasting with bus got: {:?}", Local::now().format("%Y-%m-%d %H:%M:%S"), quote);
                         debug!("Broadcasting quote: {:?}", quote);
+                        // Serialize quote to binary format
                         if let Ok(encoded) = bincode::serialize(&quote) {
+                            // Send serialized quote to connected client
                             if let Err(e) = self.socket.send(&encoded) {
                                 eprintln!("[{}] Failed to send quote: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
                                 error!("Failed to send quote: {}", e);
