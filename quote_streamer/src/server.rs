@@ -4,9 +4,9 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::Mutex;
-use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
+use quote_generator_lib::timestamp;
 
 use crate::quote_udp_sender::{QuoteSender};
 
@@ -19,7 +19,7 @@ fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) ->
 
     println!(
         "[{}] Streaming quotes for tickers: {} to address: {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S"),
+        timestamp(),
         tickers, addr
     );
     info!("Streaming quotes for tickers: {} to address: {}", tickers, addr);
@@ -29,7 +29,7 @@ fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) ->
             match quote_sender.start_broadcasting_with_bus(addr, tickers, bus) {
                 Ok(server_addr) => Some(server_addr),
                 Err(e) => {
-                    eprintln!("[{}] Failed to start broadcasting: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                    eprintln!("[{}] Failed to start broadcasting: {}", timestamp(), e);
                     error!("Failed to start broadcasting: {}", e);
                     None
                 }

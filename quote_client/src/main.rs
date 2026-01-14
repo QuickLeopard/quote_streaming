@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration};
 
 use clap::Parser;
-use chrono::Local;
+use quote_generator_lib::timestamp;
 
 mod cli_args;
 mod quote_udp_receiver;
@@ -47,7 +47,7 @@ fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>
     reader.read_line(&mut line)?;
     print!("{}", line);
 
-    println!("[{}] Connected to server!", Local::now().format("%Y-%m-%d %H:%M:%S"));
+    println!("[{}] Connected to server!", timestamp());
     Ok((stream, reader))
 }
 
@@ -80,13 +80,13 @@ fn main() -> io::Result<()> {
     let shutdown_clone = Arc::clone(&shutdown);
     
     ctrlc::set_handler(move || {
-        println!("\n[{}] Ctrl+C received, shutting down...", Local::now().format("%Y-%m-%d %H:%M:%S"));
+        println!("\n[{}] Ctrl+C received, shutting down...", timestamp());
         shutdown_clone.store(true, Ordering::Relaxed);
     }).expect("Error setting Ctrl+C handler");
     
     println!(
         "[{}] Connecting Quote Client to {}:{} stream_addr: {} tickers: {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S"),
+        timestamp(),
         cli.host, cli.port, cli.stream_addr, cli.tickers
     );
     let (mut stream, mut reader) = connect(&cli.host, cli.port)?;
@@ -95,7 +95,7 @@ fn main() -> io::Result<()> {
 
     match send_command(&mut stream, &mut reader, command) {
         Ok(resp) => {
-            print!("[{}] Server response: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), resp);
+            print!("[{}] Server response: {}", timestamp(), resp);
             
             // Extract server address from response
             let server_addr = resp
@@ -106,12 +106,12 @@ fn main() -> io::Result<()> {
             
             let quote_receiver = quote_udp_receiver::QuoteReceiver::new(&cli.stream_addr)?;
             if let Err(e) = quote_receiver.receive_loop(server_addr, shutdown) {
-                eprintln!("[{}] Receive loop failed: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                eprintln!("[{}] Receive loop failed: {}", timestamp(), e);
             }
-            println!("[{}] Client shutdown complete", Local::now().format("%Y-%m-%d %H:%M:%S"));
+            println!("[{}] Client shutdown complete", timestamp());
         }
         Err(e) => {
-            eprintln!("[{}] Command failed: {}.", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+            eprintln!("[{}] Command failed: {}.", timestamp(), e);
         }
     }
 

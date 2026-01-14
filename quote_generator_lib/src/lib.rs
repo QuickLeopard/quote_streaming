@@ -7,6 +7,7 @@ pub mod core {
 }
 
 use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::Local;
 
 /// Returns the current timestamp in milliseconds since UNIX epoch
 pub fn get_current_timestamp() -> u64 {
@@ -14,6 +15,11 @@ pub fn get_current_timestamp() -> u64 {
         .duration_since(UNIX_EPOCH)
         .expect("System time before UNIX epoch")
         .as_millis() as u64
+}
+
+/// Returns current timestamp formatted as YYYY-MM-DD HH:MM:SS
+pub fn timestamp() -> String {
+    Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 #[cfg(test)]
@@ -64,5 +70,27 @@ mod tests {
     fn timestamp_is_valid() {
         let ts = get_current_timestamp();
         assert!(ts > 1700000000000); // After 2023
+    }
+
+    #[test]
+    fn timestamp_format() {
+        let ts = timestamp();
+        // Format: YYYY-MM-DD HH:MM:SS (19 characters)
+        assert_eq!(ts.len(), 19);
+        // Check format with regex-like pattern
+        let parts: Vec<&str> = ts.split(' ').collect();
+        assert_eq!(parts.len(), 2);
+        
+        let date_parts: Vec<&str> = parts[0].split('-').collect();
+        assert_eq!(date_parts.len(), 3);
+        assert_eq!(date_parts[0].len(), 4); // Year
+        assert_eq!(date_parts[1].len(), 2); // Month
+        assert_eq!(date_parts[2].len(), 2); // Day
+        
+        let time_parts: Vec<&str> = parts[1].split(':').collect();
+        assert_eq!(time_parts.len(), 3);
+        assert_eq!(time_parts[0].len(), 2); // Hour
+        assert_eq!(time_parts[1].len(), 2); // Minute
+        assert_eq!(time_parts[2].len(), 2); // Second
     }
 }

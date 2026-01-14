@@ -10,10 +10,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::HashSet;
 
 use bus::Bus;
-use chrono::Local;
 use log::{info, error, warn, debug};
 
 use quote_generator_lib::core::StockQuote;
+use quote_generator_lib::timestamp;
 
 const PING_TIMEOUT_SECS: u64 = 5;
 const PING_CHECK_INTERVAL_SECS: u64 = 1;
@@ -89,7 +89,7 @@ impl QuoteSender {
                     // Check if received message is "ping"
                     if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
                         if msg.trim() == "ping" {
-                            println!("[{}] Received ping from {}", Local::now().format("%Y-%m-%d %H:%M:%S"), src);
+                            println!("[{}] Received ping from {}", timestamp(), src);
                             debug!("Received ping from {}", src);
                             // Update last ping timestamp
                             if let Ok(mut last_ping) = last_ping_clone.lock() {
@@ -101,7 +101,7 @@ impl QuoteSender {
                     }
                 }
             }
-            println!("[{}] Ping listener thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone);
+            println!("[{}] Ping listener thread stopped for {}", timestamp(), target_addr_clone);
         });
 
         // Thread 2: Timeout checker - monitors last ping time and triggers shutdown if timeout
@@ -116,7 +116,7 @@ impl QuoteSender {
                 // Check if last ping was more than PING_TIMEOUT_SECS ago
                 if let Ok(last_ping) = last_ping_clone.lock() {
                     if last_ping.elapsed() > Duration::from_secs(PING_TIMEOUT_SECS) {
-                        println!("[{}] [TIMEOUT] No ping from {} for {} seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2, PING_TIMEOUT_SECS);
+                        println!("[{}] [TIMEOUT] No ping from {} for {} seconds, shutting down all threads", timestamp(), target_addr_clone2, PING_TIMEOUT_SECS);
                         warn!("No ping from {} for {} seconds, shutting down all threads", target_addr_clone2, PING_TIMEOUT_SECS);
                         // Set shutdown flag to stop all threads
                         shutdown_clone.store(true, Ordering::Relaxed);
@@ -124,7 +124,7 @@ impl QuoteSender {
                     }
                 }
             }
-            println!("[{}] Timeout checker thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
+            println!("[{}] Timeout checker thread stopped for {}", timestamp(), target_addr_clone2);
             info!("Timeout checker thread stopped for {}", target_addr_clone2);
         });
 
@@ -136,20 +136,20 @@ impl QuoteSender {
                 if let Ok(quote) = reader.recv() {
                     // Only send quotes for subscribed tickers
                     if tickers.contains(&quote.ticker) {
-                        println!("[{}] Broadcasting with bus got: {:?}", Local::now().format("%Y-%m-%d %H:%M:%S"), quote);
+                        println!("[{}] Broadcasting with bus got: {:?}", timestamp(), quote);
                         debug!("Broadcasting quote: {:?}", quote);
                         // Serialize quote to binary format
                         if let Ok(encoded) = bincode::serialize(&quote) {
                             // Send serialized quote to connected client
                             if let Err(e) = self.socket.send(&encoded) {
-                                eprintln!("[{}] Failed to send quote: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                                eprintln!("[{}] Failed to send quote: {}", timestamp(), e);
                                 error!("Failed to send quote: {}", e);
                             }
                         }
                     }
                 }
             }
-            println!("[{}] Broadcasting thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr);
+            println!("[{}] Broadcasting thread stopped for {}", timestamp(), target_addr);
             info!("Broadcasting thread stopped for {}", target_addr);
         });
 

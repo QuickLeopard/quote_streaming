@@ -4,9 +4,9 @@ use std::thread;
 use std::time::Duration;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
+use quote_generator_lib::timestamp;
 
 const PING_INTERVAL_SECS: u64 = 2;
 const RECEIVE_BUFFER_SIZE: usize = 1024;
@@ -20,7 +20,7 @@ impl QuoteReceiver {
     /// Creates a new QuoteReceiver bound to the specified address
     pub fn new(bind_addr: &str) -> Result<Self, std::io::Error> {
         let socket = UdpSocket::bind(bind_addr)?;
-        println!("[{}] Ресивер запущен на {}", Local::now().format("%Y-%m-%d %H:%M:%S"), bind_addr);
+        println!("[{}] Ресивер запущен на {}", timestamp(), bind_addr);
         Ok(Self { socket })
     }
 
@@ -44,7 +44,7 @@ impl QuoteReceiver {
             while running_clone.load(Ordering::Relaxed) && !shutdown_clone.load(Ordering::Relaxed) {
                 // Send ping message to server
                 if let Err(e) = socket_clone.send(b"ping") {
-                    eprintln!("[{}] Failed to send ping: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                    eprintln!("[{}] Failed to send ping: {}", timestamp(), e);
                     break;
                 }
                 // Wait 2 seconds before sending next ping
@@ -52,13 +52,13 @@ impl QuoteReceiver {
             }
         });
 
-        println!("[{}] Ожидание данных...", Local::now().format("%Y-%m-%d %H:%M:%S"));
+        println!("[{}] Ожидание данных...", timestamp());
 
         // Main receive loop - receives both pong responses and stock quotes from server
         loop {
             // Check for Ctrl+C signal
             if shutdown.load(Ordering::Relaxed) {
-                println!("[{}] Shutdown signal received, stopping client", Local::now().format("%Y-%m-%d %H:%M:%S"));
+                println!("[{}] Shutdown signal received, stopping client", timestamp());
                 running.store(false, Ordering::Relaxed);
                 break;
             }
@@ -76,7 +76,7 @@ impl QuoteReceiver {
                     match bincode::deserialize::<StockQuote>(&buf[..size]) {
                         Ok(quote) => {
                             // Successfully received and deserialized a quote
-                            println!("[{}] {:?}", Local::now().format("%Y-%m-%d %H:%M:%S"), quote);
+                            println!("[{}] {:?}", timestamp(), quote);
                         }
                         Err(_) => {
                             // Silently ignore deserialization errors (could be pong or corrupted data)
@@ -85,8 +85,8 @@ impl QuoteReceiver {
                 }
                 Err(e) => {
                     // Connection error - server likely disconnected
-                    eprintln!("[{}] Ошибка получения данных: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
-                    println!("[{}] Server disconnected, shutting down client", Local::now().format("%Y-%m-%d %H:%M:%S"));
+                    eprintln!("[{}] Ошибка получения данных: {}", timestamp(), e);
+                    println!("[{}] Server disconnected, shutting down client", timestamp());
                     // Signal ping sender thread to stop
                     running.store(false, Ordering::Relaxed);
                     break;
