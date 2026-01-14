@@ -4,19 +4,22 @@ use rand;
 
 use crate::core::types::StockQuote;
 
+/// Generator for creating and updating stock quotes
 pub struct QuoteGenerator {
     pub quotes: HashMap<String, StockQuote>,
 }
 
 impl QuoteGenerator {
+    /// Creates a new QuoteGenerator with an empty quotes map
     pub fn new() -> Self {
-        //QuoteGenerator::from (vec!["AAPL".to_string (), "TSLA".to_string ()])
-
         QuoteGenerator {
             quotes: HashMap::new(),
         }
     }
 
+    /// Generates or updates a quote for the given ticker symbol
+    /// 
+    /// Returns the updated quote or None if generation fails
     pub fn generate_quote(&mut self, ticker: &str) -> Option<StockQuote> {
         let _ = self
             .quotes

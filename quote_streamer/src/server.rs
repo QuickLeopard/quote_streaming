@@ -9,6 +9,9 @@ use quote_generator_lib::core::StockQuote;
 
 use crate::quote_udp_sender::{QuoteSender};
 
+/// Initiates quote streaming to a client address
+/// 
+/// Returns the server's socket address on success, None on failure
 fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) -> Option<String> {
     let addr = addr.to_string().clone();
     let tickers = tickers.to_string().clone();
@@ -36,6 +39,7 @@ fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) ->
     }
 }
 
+/// Handles a connected TCP client, processing commands and managing quote streams
 pub fn handle_client(stream: TcpStream, bus: Arc<Mutex<Bus<StockQuote>>>) {
     let mut writer = stream.try_clone().expect("failed to clone stream");
     let mut reader = BufReader::new(stream);

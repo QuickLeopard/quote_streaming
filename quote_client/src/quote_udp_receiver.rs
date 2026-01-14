@@ -8,18 +8,22 @@ use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
 
+/// UDP receiver for receiving stock quotes from the server
 pub struct QuoteReceiver {
     socket: UdpSocket,
 }
 
 impl QuoteReceiver {
+    /// Creates a new QuoteReceiver bound to the specified address
     pub fn new(bind_addr: &str) -> Result<Self, std::io::Error> {
         let socket = UdpSocket::bind(bind_addr)?;
         println!("[{}] Ресивер запущен на {}", Local::now().format("%Y-%m-%d %H:%M:%S"), bind_addr);
         Ok(Self { socket })
     }
 
-    // Метод с циклом для получения метрик
+    /// Starts the receive loop, connecting to server and handling quotes and ping/pong
+    /// 
+    /// Sends ping every 2 seconds and receives quotes from the server
     pub fn receive_loop(self, server_addr: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.socket.connect(server_addr)?;
         

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Represents a stock quote with ticker, price, volume, and timestamp
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StockQuote {
     pub ticker: String,
@@ -9,6 +10,7 @@ pub struct StockQuote {
 }
 
 impl StockQuote {
+    /// Creates a new StockQuote
     pub fn new(ticker: &str, price: f64, volume: u32, timestamp: u64) -> Self {
         Self {
             ticker: ticker.to_string(),
@@ -18,6 +20,7 @@ impl StockQuote {
         }
     }
 
+    /// Converts the quote to a pipe-delimited string format
     pub fn to_string(&self) -> String {
         format!(
             "{}|{}|{}|{}",
@@ -25,6 +28,9 @@ impl StockQuote {
         )
     }
 
+    /// Parses a StockQuote from a pipe-delimited string
+    /// 
+    /// Returns None if the string format is invalid
     pub fn from_string(s: &str) -> Option<Self> {
         let parts: Vec<&str> = s.split('|').collect();
         if parts.len() == 4 {

@@ -14,17 +14,19 @@ use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
 
+/// UDP sender for broadcasting stock quotes to clients
 pub struct QuoteSender {
     socket: UdpSocket,
 }
 
 impl QuoteSender {
+    /// Creates a new QuoteSender bound to the specified address
     pub fn new(bind_addr: &str) -> Result<Self, std::io::Error> {
         let socket = UdpSocket::bind(bind_addr)?;
         Ok(Self { socket })
     }
 
-    // Метод отправки сообщений в сокет
+    /// Sends a quote to the specified target address
     pub fn send_to(
         &self,
         quote: &StockQuote,
@@ -35,6 +37,14 @@ impl QuoteSender {
         Ok(())
     }
 
+    /// Starts broadcasting quotes from the bus to the target address
+    /// 
+    /// Creates three threads:
+    /// - Ping listener: Receives ping messages from client and responds with pong
+    /// - Timeout checker: Monitors last ping time, shuts down after 5 seconds without ping
+    /// - Broadcasting: Sends filtered quotes to the connected client
+    /// 
+    /// Returns the server's local socket address for client connection
     pub fn start_broadcasting_with_bus(
         self,
         target_addr: String,

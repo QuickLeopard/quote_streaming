@@ -7,8 +7,8 @@ pub mod core {
 }
 
 use std::time::{SystemTime, UNIX_EPOCH};
-//use core::StockQuote;
 
+/// Returns the current timestamp in milliseconds since UNIX epoch
 pub fn get_current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
