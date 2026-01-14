@@ -56,7 +56,7 @@ impl QuoteSender {
             .map(|s| s.to_string())
             .collect::<HashSet<String>>();
 
-        let mut bus = bus.lock().unwrap();
+        let mut bus = bus.lock().map_err(|_| "Bus lock poisoned")?;
         let mut reader = bus.add_rx();
 
         self.socket.connect(&target_addr)?;
@@ -80,7 +80,9 @@ impl QuoteSender {
                     if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
                         if msg.trim() == "ping" {
                             println!("[{}] Received ping from {}", Local::now().format("%Y-%m-%d %H:%M:%S"), src);
-                            *last_ping_clone.lock().unwrap() = Instant::now();
+                            if let Ok(mut last_ping) = last_ping_clone.lock() {
+                                *last_ping = Instant::now();
+                            }
                             let _ = socket_clone.send(b"pong");
                         }
                     }
@@ -97,10 +99,12 @@ impl QuoteSender {
         thread::spawn(move || {
             while !shutdown_clone.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_secs(1));
-                if last_ping_clone.lock().unwrap().elapsed() > Duration::from_secs(5) {
-                    println!("[{}] [TIMEOUT] No ping from {} for 5 seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
-                    shutdown_clone.store(true, Ordering::Relaxed);
-                    break;
+                if let Ok(last_ping) = last_ping_clone.lock() {
+                    if last_ping.elapsed() > Duration::from_secs(5) {
+                        println!("[{}] [TIMEOUT] No ping from {} for 5 seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
+                        shutdown_clone.store(true, Ordering::Relaxed);
+                        break;
+                    }
                 }
             }
             println!("[{}] Timeout checker thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
@@ -112,9 +116,10 @@ impl QuoteSender {
                 if let Ok(quote) = reader.recv() {
                     if tickers.contains(&quote.ticker) {
                         println!("[{}] Broadcasting with bus got: {:?}", Local::now().format("%Y-%m-%d %H:%M:%S"), quote);
-                        let encoded = bincode::serialize(&quote).unwrap();
-                        if let Err(e) = self.socket.send(&encoded) {
-                            eprintln!("[{}] Failed to send quote: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                        if let Ok(encoded) = bincode::serialize(&quote) {
+                            if let Err(e) = self.socket.send(&encoded) {
+                                eprintln!("[{}] Failed to send quote: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                            }
                         }
                     }
                 }

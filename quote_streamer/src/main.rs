@@ -41,10 +41,9 @@ fn streaming(tickers: Vec<String>, bus: Arc<Mutex<Bus<StockQuote>>>, interval_ms
                 let quote = generator.generate_quote(ticker);
 
                 if let Some(quote) = quote {
-                    let mut bus = bus.lock().unwrap();
-
-                    bus.broadcast(quote.clone());
-
+                    if let Ok(mut bus) = bus.lock() {
+                        bus.broadcast(quote.clone());
+                    }
                     thread::sleep(Duration::from_millis(10));
                 }
             }

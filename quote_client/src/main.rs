@@ -28,7 +28,9 @@ fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>
         )?;
     }
 
-    let addr: SocketAddr = format!("{}:{}", host, port).parse().unwrap();
+    let addr: SocketAddr = format!("{}:{}", host, port)
+        .parse()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
     socket.connect(&addr.into())?;
 
     let stream: TcpStream = socket.into();
