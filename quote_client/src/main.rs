@@ -6,6 +6,7 @@ use std::net::{SocketAddr, TcpStream};
 use std::time::{Duration};
 
 use clap::Parser;
+use chrono::Local;
 
 mod cli_args;
 mod quote_udp_receiver;
@@ -36,7 +37,7 @@ fn connect(host: &str, port: u16) -> io::Result<(TcpStream, BufReader<TcpStream>
     reader.read_line(&mut line)?;
     print!("{}", line);
 
-    println!("Connected to server!");
+    println!("[{}] Connected to server!", Local::now().format("%Y-%m-%d %H:%M:%S"));
     Ok((stream, reader))
 }
 
@@ -64,7 +65,8 @@ fn send_command(
 fn main() -> io::Result<()> {
     let cli = cli_args::CliArgs::parse();
     println!(
-        "Connecting Quote Client to {}:{} stream_addr: {} tickers: {}",
+        "[{}] Connecting Quote Client to {}:{} stream_addr: {} tickers: {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S"),
         cli.host, cli.port, cli.stream_addr, cli.tickers
     );
     let (mut stream, mut reader) = connect(&cli.host, cli.port)?;
@@ -73,14 +75,22 @@ fn main() -> io::Result<()> {
 
     match send_command(&mut stream, &mut reader, command) {
         Ok(resp) => {
-            print!("Server response: {}", resp);
+            print!("[{}] Server response: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), resp);
+            
+            // Extract server address from response
+            let server_addr = resp
+                .split("server: ")
+                .nth(1)
+                .and_then(|s| s.trim().split_whitespace().next())
+                .unwrap_or(&cli.stream_addr);
+            
             let quote_receiver = quote_udp_receiver::QuoteReceiver::new(&cli.stream_addr)?;
-            if let Err(e) = quote_receiver.receive_loop() {
-                eprintln!("Receive loop failed: {}", e);
+            if let Err(e) = quote_receiver.receive_loop(server_addr) {
+                eprintln!("[{}] Receive loop failed: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
             }
         }
         Err(e) => {
-            eprintln!("Command failed: {}.", e);
+            eprintln!("[{}] Command failed: {}.", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
         }
     }
 

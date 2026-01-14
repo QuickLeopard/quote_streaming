@@ -3,39 +3,37 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::Mutex;
+use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
 
 use crate::quote_udp_sender::{QuoteSender};
 
-fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) {
-    //-> std::thread::JoinHandle<()> {
-
+fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) -> Option<String> {
     let addr = addr.to_string().clone();
     let tickers = tickers.to_string().clone();
 
-    // Implementation for streaming quotes
-    //let handle = thread::spawn(move || {
-    // Simulate streaming quotes to the given UDP address
     println!(
-        "Streaming quotes for tickers: {} to address: {}",
+        "[{}] Streaming quotes for tickers: {} to address: {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S"),
         tickers, addr
     );
 
-    //quote_udp_sender.start_broadcasting(addr.clone(), 1000);
-
     match QuoteSender::new("0.0.0.0:0") {
         Ok(quote_sender) => {
-            if let Err(e) = quote_sender.start_broadcasting_with_bus(addr, tickers, bus) {
-                eprintln!("Failed to start broadcasting: {}", e);
+            match quote_sender.start_broadcasting_with_bus(addr, tickers, bus) {
+                Ok(server_addr) => Some(server_addr),
+                Err(e) => {
+                    eprintln!("[{}] Failed to start broadcasting: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                    None
+                }
             }
         }
         Err(e) => {
-            eprintln!("Failed to create QuoteSender: {}", e);
+            eprintln!("[{}] Failed to create QuoteSender: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+            None
         }
     }
-    //});
-    //handle
 }
 
 pub fn handle_client(stream: TcpStream, bus: Arc<Mutex<Bus<StockQuote>>>) {
@@ -66,19 +64,22 @@ pub fn handle_client(stream: TcpStream, bus: Arc<Mutex<Bus<StockQuote>>>) {
                 let mut parts = uppercased.split_whitespace();
                 let response = match parts.next() {
                     Some("HELLO") => "Hi, there!\n",
-                    //STREAM udp://127.0.0.1:34254 AAPL,TSLA.
+                    
                     Some("STREAM") => {
                         let addr = parts.next();
                         let tickers = parts.next();
                         match (addr, tickers) {
                             (Some(addr), Some(tickers)) if addr.starts_with("UDP://") => {
                                 let bus0 = Arc::clone(&bus);
-                                let _handle = stream_quotes(&addr[6..], tickers, bus0);
-                                &format!(
-                                    "Got STREAM command addr: {} tickers: {}\n",
-                                    addr.to_lowercase(),
-                                    tickers
-                                )
+                                match stream_quotes(&addr[6..], tickers, bus0) {
+                                    Some(server_addr) => &format!(
+                                        "Got STREAM command addr: {} tickers: {} server: {}\n",
+                                        addr.to_lowercase(),
+                                        tickers,
+                                        server_addr
+                                    ),
+                                    None => "ERROR: Failed to start streaming\n",
+                                }
                             }
                             _ => "ERROR: use like 'STREAM udp://127.0.0.1:1234 AAPL,TSLA'\n",
                         }

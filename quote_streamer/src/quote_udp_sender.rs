@@ -4,10 +4,13 @@ use std::net::UdpSocket;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::collections::HashSet;
 
 use bus::Bus;
+use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
 
@@ -37,31 +40,78 @@ impl QuoteSender {
         target_addr: String,
         tickers: String,
         bus: Arc<Mutex<Bus<StockQuote>>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let tickers = tickers
             .split(",")
             .map(|s| s.to_string())
             .collect::<HashSet<String>>();
 
         let mut bus = bus.lock().unwrap();
-
         let mut reader = bus.add_rx();
 
-        let _ = thread::spawn(move || {
-            while let Ok(quote) = reader.recv() {
-                let ticker = quote.ticker.clone();
-                if tickers.contains(&ticker) {
-                    println!("Broadcasting with bus got: {:?}", quote);
+        self.socket.connect(&target_addr)?;
+        let server_addr = self.socket.local_addr()?.to_string();
 
-                    if let Err(e) = self.send_to(&quote, &target_addr) {
-                        eprintln!("Failed to send quote: {}", e);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let last_ping = Arc::new(Mutex::new(Instant::now()));
+
+        // Ping listener thread
+        let socket_clone = self.socket.try_clone()?;
+        let shutdown_clone = Arc::clone(&shutdown);
+        let last_ping_clone = Arc::clone(&last_ping);
+        let target_addr_clone = target_addr.clone();
+        
+        thread::spawn(move || {
+            socket_clone.set_read_timeout(Some(Duration::from_millis(100))).ok();
+            let mut buf = [0u8; 64];
+            
+            while !shutdown_clone.load(Ordering::Relaxed) {
+                if let Ok((size, src)) = socket_clone.recv_from(&mut buf) {
+                    if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
+                        if msg.trim() == "ping" {
+                            println!("[{}] Received ping from {}", Local::now().format("%Y-%m-%d %H:%M:%S"), src);
+                            *last_ping_clone.lock().unwrap() = Instant::now();
+                            let _ = socket_clone.send(b"pong");
+                        }
                     }
-                } else {
-                    //println! ("Skipping ticker: {}", ticker);
                 }
             }
+            println!("[{}] Ping listener thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone);
         });
 
-        Ok(())
+        // Timeout checker thread
+        let shutdown_clone = Arc::clone(&shutdown);
+        let last_ping_clone = Arc::clone(&last_ping);
+        let target_addr_clone2 = target_addr.clone();
+        
+        thread::spawn(move || {
+            while !shutdown_clone.load(Ordering::Relaxed) {
+                thread::sleep(Duration::from_secs(1));
+                if last_ping_clone.lock().unwrap().elapsed() > Duration::from_secs(5) {
+                    println!("[{}] [TIMEOUT] No ping from {} for 5 seconds, shutting down all threads", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
+                    shutdown_clone.store(true, Ordering::Relaxed);
+                    break;
+                }
+            }
+            println!("[{}] Timeout checker thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr_clone2);
+        });
+
+        // Broadcasting thread
+        thread::spawn(move || {
+            while !shutdown.load(Ordering::Relaxed) {
+                if let Ok(quote) = reader.recv() {
+                    if tickers.contains(&quote.ticker) {
+                        println!("[{}] Broadcasting with bus got: {:?}", Local::now().format("%Y-%m-%d %H:%M:%S"), quote);
+                        let encoded = bincode::serialize(&quote).unwrap();
+                        if let Err(e) = self.socket.send(&encoded) {
+                            eprintln!("[{}] Failed to send quote: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+                        }
+                    }
+                }
+            }
+            println!("[{}] Broadcasting thread stopped for {}", Local::now().format("%Y-%m-%d %H:%M:%S"), target_addr);
+        });
+
+        Ok(server_addr)
     }
 }
