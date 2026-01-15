@@ -101,7 +101,7 @@ fn main() -> io::Result<()> {
             let server_addr = resp
                 .split("server: ")
                 .nth(1)
-                .and_then(|s| s.trim().split_whitespace().next())
+                .and_then(|s| s.split_whitespace().next())
                 .unwrap_or(&cli.stream_addr);
             
             let quote_receiver = quote_udp_receiver::QuoteReceiver::new(&cli.stream_addr)?;

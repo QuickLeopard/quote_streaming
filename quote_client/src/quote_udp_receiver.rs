@@ -1,4 +1,4 @@
-use bincode;
+
 use std::net::UdpSocket;
 use std::thread;
 use std::time::Duration;
@@ -66,11 +66,11 @@ impl QuoteReceiver {
             match self.socket.recv(&mut buf) {
                 Ok(size) => {
                     // Check if received message is a "pong" response
-                    if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
-                        if msg.trim() == "pong" {
+                    if let Ok(msg) = std::str::from_utf8(&buf[..size]) 
+                        && msg.trim() == "pong" {
                             // Ignore pong messages, they're just keep-alive responses
                             continue;
-                        }
+                        
                     }
                     // Try to deserialize as StockQuote
                     match bincode::deserialize::<StockQuote>(&buf[..size]) {

@@ -1,4 +1,3 @@
-use bincode;
 
 use std::net::UdpSocket;
 use std::sync::Arc;
@@ -29,18 +28,7 @@ impl QuoteSender {
     pub fn new(bind_addr: &str) -> Result<Self, std::io::Error> {
         let socket = UdpSocket::bind(bind_addr)?;
         Ok(Self { socket })
-    }
-
-    /// Sends a quote to the specified target address
-    pub fn send_to(
-        &self,
-        quote: &StockQuote,
-        target_addr: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let encoded = bincode::serialize(quote)?;
-        self.socket.send_to(&encoded, target_addr)?;
-        Ok(())
-    }
+    }    
 
     /// Starts broadcasting quotes from the bus to the target address
     /// 
@@ -87,17 +75,17 @@ impl QuoteSender {
             while !shutdown_clone.load(Ordering::Relaxed) {
                 if let Ok((size, src)) = socket_clone.recv_from(&mut buf) {
                     // Check if received message is "ping"
-                    if let Ok(msg) = std::str::from_utf8(&buf[..size]) {
-                        if msg.trim() == "ping" {
-                            println!("[{}] Received ping from {}", timestamp(), src);
-                            debug!("Received ping from {}", src);
-                            // Update last ping timestamp
-                            if let Ok(mut last_ping) = last_ping_clone.lock() {
-                                *last_ping = Instant::now();
-                            }
-                            // Send pong response back to client
-                            let _ = socket_clone.send(b"pong");
+                    if let Ok(msg) = std::str::from_utf8(&buf[..size]) 
+                        && msg.trim() == "ping" {
+                            
+                        println!("[{}] Received ping from {}", timestamp(), src);
+                        debug!("Received ping from {}", src);
+                        // Update last ping timestamp
+                        if let Ok(mut last_ping) = last_ping_clone.lock() {
+                            *last_ping = Instant::now();
                         }
+                        // Send pong response back to client
+                        let _ = socket_clone.send(b"pong");                        
                     }
                 }
             }
@@ -114,14 +102,14 @@ impl QuoteSender {
             while !shutdown_clone.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_secs(PING_CHECK_INTERVAL_SECS));
                 // Check if last ping was more than PING_TIMEOUT_SECS ago
-                if let Ok(last_ping) = last_ping_clone.lock() {
-                    if last_ping.elapsed() > Duration::from_secs(PING_TIMEOUT_SECS) {
-                        println!("[{}] [TIMEOUT] No ping from {} for {} seconds, shutting down all threads", timestamp(), target_addr_clone2, PING_TIMEOUT_SECS);
-                        warn!("No ping from {} for {} seconds, shutting down all threads", target_addr_clone2, PING_TIMEOUT_SECS);
-                        // Set shutdown flag to stop all threads
-                        shutdown_clone.store(true, Ordering::Relaxed);
-                        break;
-                    }
+                if let Ok(last_ping) = last_ping_clone.lock() 
+                    && last_ping.elapsed() > Duration::from_secs(PING_TIMEOUT_SECS) {
+
+                    println!("[{}] [TIMEOUT] No ping from {} for {} seconds, shutting down all threads", timestamp(), target_addr_clone2, PING_TIMEOUT_SECS);
+                    warn!("No ping from {} for {} seconds, shutting down all threads", target_addr_clone2, PING_TIMEOUT_SECS);
+                    // Set shutdown flag to stop all threads
+                    shutdown_clone.store(true, Ordering::Relaxed);
+                    break;                    
                 }
             }
             println!("[{}] Timeout checker thread stopped for {}", timestamp(), target_addr_clone2);

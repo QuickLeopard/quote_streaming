@@ -1,9 +1,11 @@
 use bus::Bus;
-use log::{info, error, debug};
+use log::{info, error};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::Mutex;
+
+use chrono::Local;
 
 use quote_generator_lib::core::StockQuote;
 use quote_generator_lib::timestamp;

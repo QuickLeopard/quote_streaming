@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 /// Represents a stock quote with ticker, price, volume, and timestamp
@@ -20,14 +22,6 @@ impl StockQuote {
         }
     }
 
-    /// Converts the quote to a pipe-delimited string format
-    pub fn to_string(&self) -> String {
-        format!(
-            "{}|{}|{}|{}",
-            self.ticker, self.price, self.volume, self.timestamp
-        )
-    }
-
     /// Parses a StockQuote from a pipe-delimited string
     /// 
     /// Returns None if the string format is invalid
@@ -43,5 +37,21 @@ impl StockQuote {
         } else {
             None
         }
+    }
+}
+
+impl Default for StockQuote {
+    fn default() -> Self {
+        Self::new("", 0.0, 0, 0)
+    }
+}
+
+impl Display for StockQuote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}|{}|{}|{}",
+            self.ticker, self.price, self.volume, self.timestamp
+        )
     }
 }
