@@ -36,7 +36,7 @@ fn stream_quotes(addr: &str, tickers: &str, bus: Arc<Mutex<Bus<StockQuote>>>) ->
             }
         }
         Err(e) => {
-            eprintln!("[{}] Failed to create QuoteSender: {}", Local::now().format("%Y-%m-%d %H:%M:%S"), e);
+            eprintln!("[{}] Failed to create QuoteSender: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), e);
             error!("Failed to create QuoteSender: {}", e);
             None
         }
